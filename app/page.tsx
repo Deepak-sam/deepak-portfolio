@@ -20,10 +20,14 @@ export default function HomePage() {
           <CanvasClient />
         </div>
 
-        {/* Subtle grid overlay */}
+        {/* Legibility scrim — darken canvas around text without hiding it */}
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-0 z-10 bg-grid opacity-40 mix-blend-screen no-print"
+          className="pointer-events-none fixed inset-0 z-10 no-print"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(5,7,13,0.55) 0%, rgba(5,7,13,0.15) 25%, rgba(5,7,13,0.15) 75%, rgba(5,7,13,0.55) 100%)",
+          }}
         />
 
         <Header />

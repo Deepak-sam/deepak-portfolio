@@ -28,14 +28,14 @@ export default function CameraRig() {
     // scene 7 handshake: face-on, low
 
     const kf: { p: number; offset: THREE.Vector3; look: THREE.Vector3 }[] = [
-      { p: 0.0, offset: new THREE.Vector3(0, 2.4, 7), look: new THREE.Vector3(0, 1.4, 0) },
-      { p: 0.12, offset: new THREE.Vector3(-1.2, 2.6, 6), look: new THREE.Vector3(0, 1.3, -0.5) },
-      { p: 0.26, offset: new THREE.Vector3(-3.2, 2.5, 4.5), look: new THREE.Vector3(0.5, 1.3, -0.5) },
-      { p: 0.42, offset: new THREE.Vector3(-4, 3.2, 5), look: new THREE.Vector3(0.5, 1.2, -0.5) },
-      { p: 0.58, offset: new THREE.Vector3(-3.5, 2.2, 3.5), look: new THREE.Vector3(0.2, 1.4, -0.5) },
-      { p: 0.72, offset: new THREE.Vector3(-2.5, 2.6, 4.5), look: new THREE.Vector3(0, 1.4, -0.5) },
-      { p: 0.86, offset: new THREE.Vector3(0, 1.8, 4.5), look: new THREE.Vector3(0, 1.35, 0) },
-      { p: 1.0, offset: new THREE.Vector3(0, 1.7, 3.2), look: new THREE.Vector3(0, 1.5, 0) },
+      { p: 0.0, offset: new THREE.Vector3(0, 3.0, 8), look: new THREE.Vector3(0, 1.5, 0) },
+      { p: 0.12, offset: new THREE.Vector3(-2.0, 3.2, 6.5), look: new THREE.Vector3(0, 1.4, -0.5) },
+      { p: 0.26, offset: new THREE.Vector3(-3.6, 3.0, 5.0), look: new THREE.Vector3(0.5, 1.4, -0.5) },
+      { p: 0.42, offset: new THREE.Vector3(-4.5, 3.6, 5.5), look: new THREE.Vector3(0.5, 1.3, -0.5) },
+      { p: 0.58, offset: new THREE.Vector3(-3.8, 2.6, 4.0), look: new THREE.Vector3(0.2, 1.5, -0.5) },
+      { p: 0.72, offset: new THREE.Vector3(-2.8, 3.0, 5.0), look: new THREE.Vector3(0, 1.5, -0.5) },
+      { p: 0.86, offset: new THREE.Vector3(0, 2.2, 5.0), look: new THREE.Vector3(0, 1.4, 0) },
+      { p: 1.0, offset: new THREE.Vector3(0, 1.9, 3.5), look: new THREE.Vector3(0, 1.5, 0) },
     ];
 
     // Find surrounding keyframes
