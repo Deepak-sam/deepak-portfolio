@@ -23,16 +23,16 @@ export default function Environment() {
         azimuth={0.25}
       />
 
-      {/* Sun key light */}
+      {/* Sun key light — softer, warmer for Ghibli painterly feel */}
       <directionalLight
         position={[35, 40, -25]}
-        intensity={1.6}
-        color="#fff4d6"
+        intensity={1.15}
+        color="#fff2c8"
       />
-      {/* Sky ambient */}
-      <hemisphereLight args={["#bde0ff", "#4a5f3a", 0.65]} />
+      {/* Sky ambient — stronger hemisphere for wraparound painterly light */}
+      <hemisphereLight args={["#cfe6f5", "#6d8a4c", 0.9]} />
       {/* Warm bounce */}
-      <ambientLight intensity={0.35} color="#fff1c7" />
+      <ambientLight intensity={0.5} color="#fff2d0" />
 
       <SoftClouds />
       <Birds />

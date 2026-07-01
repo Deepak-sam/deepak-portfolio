@@ -41,13 +41,13 @@ export default function Scene() {
 
       <EffectComposer multisampling={0}>
         <Bloom
-          intensity={0.35}
-          luminanceThreshold={0.65}
-          luminanceSmoothing={0.5}
+          intensity={0.22}
+          luminanceThreshold={0.72}
+          luminanceSmoothing={0.55}
           mipmapBlur
         />
-        <BrightnessContrast brightness={0.02} contrast={0.06} />
-        <Vignette eskil={false} offset={0.28} darkness={0.55} />
+        <BrightnessContrast brightness={0.03} contrast={0.03} />
+        <Vignette eskil={false} offset={0.3} darkness={0.5} />
       </EffectComposer>
     </Canvas>
   );
