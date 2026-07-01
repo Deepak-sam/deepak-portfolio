@@ -7,21 +7,16 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { useScrollProgress, sceneProgress } from "@/lib/useScrollProgress";
 
 /**
- * Studio Ghibli-style character.
+ * Studio-Ghibli-styled Indian male character.
  *
- * Visual language:
- *  - Cel-shaded (MeshToonMaterial + 3-step gradient) — flat colour with one
- *    hard shadow band, giving that hand-painted Ghibli look.
- *  - Soft rounded features, larger almond eyes with two white highlights,
- *    painterly layered hair clumps, gentle blush, thin brows, small nose.
- *  - Warm muted palette. Business-casual chambray shirt (Ghibli protagonists
- *    dress soft; still professional-appropriate for Deepak's likeness).
+ * Design brief:
+ *  - Indian male, warm tan skin, dark hair, well-groomed short beard
+ *  - Business casual: rolled-sleeve shirt, chinos
+ *  - Smooth organic geometry: capsules/ellipsoids/lathed forms only.
+ *    NO axis-aligned boxes on the body — that's what made him look wooden.
+ *  - Cel-shaded via MeshToonMaterial + 3-band gradient for Ghibli look.
  *
- * Grounded on plausible features for the resume owner (adult South-Asian male,
- * dark hair, warm tan skin, glasses). Not a photo-perfect likeness — a
- * "Ghibli portrait" interpretation.
- *
- * If /models/deepak.glb + animations.glb are dropped in, they take over.
+ * Grounded on the resume owner (adult Indian male ~40s, glasses).
  */
 export default function Character() {
   const group = useRef<THREE.Group>(null!);
@@ -47,7 +42,7 @@ export default function Character() {
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const size = new THREE.Vector3();
         box.getSize(size);
-        const scale = size.y > 0 ? 1.7 / size.y : 1;
+        const scale = size.y > 0 ? 1.75 / size.y : 1;
         gltf.scene.scale.setScalar(scale);
         const b2 = new THREE.Box3().setFromObject(gltf.scene);
         gltf.scene.position.y -= b2.min.y;
@@ -84,7 +79,7 @@ export default function Character() {
     };
   }, []);
 
-  const rig = useMemo(() => buildGhibliRig(), []);
+  const rig = useMemo(() => buildGhibliIndianMale(), []);
 
   useFrame((_, dt) => {
     if (!group.current) return;
@@ -152,11 +147,11 @@ function pathTangent(p: number) {
   return CURVE.getTangentAt(Math.min(0.999, Math.max(0.001, p))).normalize();
 }
 
-// ---------- Ghibli toon gradient map ----------
+// ---------- Toon gradient ----------
 function makeToonGradient(): THREE.Texture {
-  // 3-step ramp: shadow / midtone / light — hard bands like cel shading
-  const data = new Uint8Array([80, 80, 80, 175, 175, 175, 255, 255, 255]);
-  const tex = new THREE.DataTexture(data, 3, 1, THREE.RGBFormat as any);
+  const data = new Uint8Array([120, 120, 120, 200, 200, 200, 255, 255, 255]);
+  const tex = new THREE.DataTexture(data, 3, 1);
+  tex.format = THREE.RGBAFormat as any;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
@@ -164,329 +159,538 @@ function makeToonGradient(): THREE.Texture {
   return tex;
 }
 
-// ---------- Ghibli character rig ----------
-function buildGhibliRig() {
+// ---------- Helper: lathed tapered limb (like a bowling pin) ----------
+function tapered(topR: number, midR: number, botR: number, height: number, seg = 20) {
+  const pts: THREE.Vector2[] = [];
+  const N = 12;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    // Two-piece taper: top→mid→bot
+    let r: number;
+    if (t < 0.5) r = THREE.MathUtils.lerp(topR, midR, t * 2);
+    else r = THREE.MathUtils.lerp(midR, botR, (t - 0.5) * 2);
+    pts.push(new THREE.Vector2(Math.max(0.001, r), t * height));
+  }
+  return new THREE.LatheGeometry(pts, seg);
+}
+
+// ---------- Helper: shirt torso — barrel with shoulder taper ----------
+function torsoGeometry(shoulderW: number, chestR: number, waistR: number, height: number) {
+  const pts: THREE.Vector2[] = [];
+  const N = 14;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    // Bottom (waist) → mid (chest) → top (shoulders)
+    let r: number;
+    if (t < 0.15) r = THREE.MathUtils.lerp(waistR * 0.9, waistR, t / 0.15);
+    else if (t < 0.55) r = THREE.MathUtils.lerp(waistR, chestR, (t - 0.15) / 0.4);
+    else if (t < 0.9) r = THREE.MathUtils.lerp(chestR, shoulderW, (t - 0.55) / 0.35);
+    else r = THREE.MathUtils.lerp(shoulderW, shoulderW * 0.85, (t - 0.9) / 0.1);
+    pts.push(new THREE.Vector2(Math.max(0.005, r), t * height));
+  }
+  return new THREE.LatheGeometry(pts, 24);
+}
+
+// ---------- BUILD ----------
+function buildGhibliIndianMale() {
   const root = new THREE.Group();
   const gradientMap = makeToonGradient();
 
-  // Materials — soft muted Ghibli palette
-  const skin = new THREE.MeshToonMaterial({ color: "#e6b892", gradientMap });
-  const skinShadow = new THREE.MeshToonMaterial({ color: "#c99872", gradientMap });
-  const hair = new THREE.MeshToonMaterial({ color: "#20160e", gradientMap });
-  const hairHi = new THREE.MeshToonMaterial({ color: "#3a2418", gradientMap });
-  const eyeWhite = new THREE.MeshBasicMaterial({ color: "#fbf6ec" });
-  const iris = new THREE.MeshBasicMaterial({ color: "#3d251a" });
-  const pupil = new THREE.MeshBasicMaterial({ color: "#0d0806" });
-  const shirt = new THREE.MeshToonMaterial({ color: "#8aa8c4", gradientMap });
-  const shirtShadow = new THREE.MeshToonMaterial({ color: "#6285a4", gradientMap });
-  const vest = new THREE.MeshToonMaterial({ color: "#5c4433", gradientMap });
-  const pants = new THREE.MeshToonMaterial({ color: "#3a3226", gradientMap });
+  // ---- Materials (warm tan Indian skin tones) ----
+  const skin = new THREE.MeshToonMaterial({ color: "#c68e63", gradientMap });
+  const skinLit = new THREE.MeshToonMaterial({ color: "#d9a67e", gradientMap });
+  const hair = new THREE.MeshToonMaterial({ color: "#1a0e08", gradientMap });
+  const hairHi = new THREE.MeshToonMaterial({ color: "#331e12", gradientMap });
+  const beard = new THREE.MeshToonMaterial({ color: "#1e120a", gradientMap });
+  const eyeWhite = new THREE.MeshBasicMaterial({ color: "#f5efe2" });
+  const iris = new THREE.MeshBasicMaterial({ color: "#4a2a15" });
+  const pupil = new THREE.MeshBasicMaterial({ color: "#0a0503" });
+
+  const shirt = new THREE.MeshToonMaterial({ color: "#e8dcc3", gradientMap }); // linen cream
+  const shirtShade = new THREE.MeshToonMaterial({ color: "#b8a687", gradientMap });
+  const pants = new THREE.MeshToonMaterial({ color: "#4a3a2a", gradientMap }); // chinos
+  const belt = new THREE.MeshToonMaterial({ color: "#2a1a10", gradientMap });
+  const buckle = new THREE.MeshBasicMaterial({ color: "#c9a15a" });
   const shoe = new THREE.MeshToonMaterial({ color: "#2a1a12", gradientMap });
-  const glassRim = new THREE.MeshBasicMaterial({ color: "#1a120a" });
+  const glassRim = new THREE.MeshBasicMaterial({ color: "#151008" });
   const lens = new THREE.MeshBasicMaterial({
     color: "#eef3f6",
     transparent: true,
     opacity: 0.18,
   });
   const blush = new THREE.MeshBasicMaterial({
-    color: "#e58c7a",
+    color: "#cf7a5a",
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.35,
   });
-  const mouthMat = new THREE.MeshBasicMaterial({ color: "#7a3a2f" });
-  const brow = new THREE.MeshBasicMaterial({ color: "#1a0e08" });
-  const noseShadow = new THREE.MeshBasicMaterial({
-    color: "#b98063",
-    transparent: true,
-    opacity: 0.6,
-  });
+  const mouthMat = new THREE.MeshBasicMaterial({ color: "#5a2822" });
+  const browMat = new THREE.MeshBasicMaterial({ color: "#120806" });
 
-  // ---- HEAD pivot ----
+  // =====================================================================
+  // HEAD (pivot at neck join, head sits above)
+  // =====================================================================
   const headPivot = new THREE.Group();
-  headPivot.position.y = 1.42;
+  headPivot.position.y = 1.5;
   root.add(headPivot);
 
-  // Ghibli heads: slightly larger, rounder, softer chin
   const headGroup = new THREE.Group();
   headGroup.position.y = 0.32;
   headPivot.add(headGroup);
 
-  // Cranium — slightly ovoid, rounded
-  const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.3, 40, 32), skin);
-  cranium.scale.set(1.0, 1.05, 0.95);
+  // Cranium — smooth egg (denser sphere = smooth silhouette)
+  const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.3, 48, 40), skin);
+  cranium.scale.set(1.0, 1.08, 0.95);
   headGroup.add(cranium);
 
-  // Soft jaw — smaller, more rounded
-  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 18), skin);
-  jaw.scale.set(0.95, 0.55, 0.9);
-  jaw.position.set(0, -0.16, 0.02);
+  // Rounded jaw (Indian face: slightly angular but softened by beard)
+  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.24, 32, 24), skin);
+  jaw.scale.set(0.93, 0.7, 0.9);
+  jaw.position.set(0, -0.16, 0.015);
   headGroup.add(jaw);
 
-  // Ears — small, tucked
-  const ear = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), skin);
-  ear.scale.set(0.45, 1.0, 0.6);
-  const earL = ear.clone();
-  earL.position.set(-0.29, -0.01, 0);
-  const earR = ear.clone();
-  earR.position.set(0.29, -0.01, 0);
+  // Cheeks — small ellipsoids adding fullness
+  const cheekL = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 16), skinLit);
+  cheekL.scale.set(1.1, 0.7, 0.7);
+  cheekL.position.set(-0.16, -0.06, 0.19);
+  const cheekR = cheekL.clone();
+  cheekR.position.x = 0.16;
+  headGroup.add(cheekL, cheekR);
+
+  // Ears — soft capsules
+  const earGeo = new THREE.CapsuleGeometry(0.045, 0.06, 8, 12);
+  const earL = new THREE.Mesh(earGeo, skin);
+  earL.rotation.z = 0.1;
+  earL.scale.set(0.85, 1, 0.55);
+  earL.position.set(-0.29, -0.02, 0);
+  const earR = new THREE.Mesh(earGeo, skin);
+  earR.rotation.z = -0.1;
+  earR.scale.set(0.85, 1, 0.55);
+  earR.position.set(0.29, -0.02, 0);
   headGroup.add(earL, earR);
 
-  // Hair — layered painterly clumps
-  // Back cap
-  const hairBack = new THREE.Mesh(
-    new THREE.SphereGeometry(0.315, 32, 24, 0, Math.PI * 2, 0, Math.PI / 1.85),
+  // Ear inner shadow
+  const earInnerL = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), skinShadow());
+  earInnerL.scale.set(0.7, 1.2, 0.3);
+  earInnerL.position.set(-0.285, -0.02, 0.015);
+  const earInnerR = earInnerL.clone();
+  earInnerR.position.x = 0.285;
+  headGroup.add(earInnerL, earInnerR);
+
+  function skinShadow() {
+    return new THREE.MeshBasicMaterial({
+      color: "#8a5a3a",
+      transparent: true,
+      opacity: 0.6,
+    });
+  }
+
+  // -------- HAIR (short, slightly wavy, Indian style) --------
+  // Base cap — cover top and back of cranium, leave forehead
+  const hairCap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.315, 40, 32, 0, Math.PI * 2, 0, Math.PI / 1.9),
     hair
   );
-  hairBack.scale.set(1.02, 1.12, 1.02);
-  hairBack.position.y = 0.015;
-  headGroup.add(hairBack);
+  hairCap.scale.set(1.03, 1.13, 1.02);
+  hairCap.position.y = 0.02;
+  headGroup.add(hairCap);
 
-  // Bangs — three overlapping tufts across the forehead
-  const bangGeo = new THREE.SphereGeometry(0.11, 16, 12);
-  const bang1 = new THREE.Mesh(bangGeo, hair);
-  bang1.scale.set(1.4, 0.5, 0.7);
-  bang1.position.set(-0.11, 0.14, 0.22);
-  bang1.rotation.z = 0.35;
-  const bang2 = new THREE.Mesh(bangGeo, hairHi);
-  bang2.scale.set(1.6, 0.45, 0.7);
-  bang2.position.set(0.02, 0.17, 0.24);
-  bang2.rotation.z = -0.15;
-  const bang3 = new THREE.Mesh(bangGeo, hair);
-  bang3.scale.set(1.3, 0.5, 0.7);
-  bang3.position.set(0.14, 0.14, 0.22);
-  bang3.rotation.z = -0.35;
-  headGroup.add(bang1, bang2, bang3);
+  // Painterly hair clumps on top (adds volume + Ghibli irregularity)
+  const clumpPositions = [
+    { x: -0.15, y: 0.24, z: 0.05, s: [1.4, 0.5, 0.9] as const, r: 0.3 },
+    { x: 0.0, y: 0.28, z: 0.02, s: [1.6, 0.55, 0.9] as const, r: 0 },
+    { x: 0.15, y: 0.24, z: 0.05, s: [1.4, 0.5, 0.9] as const, r: -0.3 },
+    { x: -0.2, y: 0.19, z: 0.15, s: [1.2, 0.5, 0.9] as const, r: 0.5 },
+    { x: 0.2, y: 0.19, z: 0.15, s: [1.2, 0.5, 0.9] as const, r: -0.5 },
+  ];
+  for (const c of clumpPositions) {
+    const clump = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 16), hair);
+    clump.scale.set(c.s[0], c.s[1], c.s[2]);
+    clump.position.set(c.x, c.y, c.z);
+    clump.rotation.z = c.r;
+    headGroup.add(clump);
+  }
 
-  // Side hair sweeps
-  const sideGeo = new THREE.SphereGeometry(0.08, 12, 10);
-  const sideL = new THREE.Mesh(sideGeo, hair);
-  sideL.scale.set(0.55, 1.6, 0.7);
-  sideL.position.set(-0.26, 0.02, 0.06);
-  const sideR = sideL.clone();
-  sideR.position.x = 0.26;
-  headGroup.add(sideL, sideR);
+  // Front fringe — a couple of forward-falling tufts (Ghibli signature)
+  const fringe1 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 16), hairHi);
+  fringe1.scale.set(1.4, 0.5, 0.65);
+  fringe1.position.set(-0.05, 0.19, 0.22);
+  fringe1.rotation.z = 0.35;
+  headGroup.add(fringe1);
+  const fringe2 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 20, 16), hair);
+  fringe2.scale.set(1.3, 0.45, 0.6);
+  fringe2.position.set(0.08, 0.2, 0.23);
+  fringe2.rotation.z = -0.35;
+  headGroup.add(fringe2);
 
-  // Slight side-part tuft (Ghibli signature — one strand catches light)
-  const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), hairHi);
-  tuft.scale.set(1.6, 0.5, 0.5);
-  tuft.position.set(-0.05, 0.22, 0.19);
-  tuft.rotation.z = 0.6;
-  headGroup.add(tuft);
+  // Sideburns — narrow strips coming down in front of ears
+  const sideburnGeo = new THREE.CapsuleGeometry(0.025, 0.09, 6, 10);
+  const sideburnL = new THREE.Mesh(sideburnGeo, hair);
+  sideburnL.scale.set(0.8, 1, 0.6);
+  sideburnL.position.set(-0.245, -0.02, 0.05);
+  const sideburnR = sideburnL.clone();
+  sideburnR.position.x = 0.245;
+  headGroup.add(sideburnL, sideburnR);
 
-  // Thin painted brows
-  const browGeo = new THREE.BoxGeometry(0.085, 0.014, 0.02);
-  const browL = new THREE.Mesh(browGeo, brow);
+  // -------- BEARD (short well-groomed) --------
+  // Chin strap — arc of small spheres along jawline
+  const beardPositions = [
+    // Chin
+    { x: 0, y: -0.24, z: 0.14, s: [1.2, 0.65, 0.8] as const },
+    { x: -0.05, y: -0.24, z: 0.13, s: [1.0, 0.6, 0.7] as const },
+    { x: 0.05, y: -0.24, z: 0.13, s: [1.0, 0.6, 0.7] as const },
+    // Along jawline down to ears
+    { x: -0.12, y: -0.22, z: 0.11, s: [1.0, 0.6, 0.7] as const },
+    { x: 0.12, y: -0.22, z: 0.11, s: [1.0, 0.6, 0.7] as const },
+    { x: -0.18, y: -0.19, z: 0.08, s: [1.0, 0.6, 0.7] as const },
+    { x: 0.18, y: -0.19, z: 0.08, s: [1.0, 0.6, 0.7] as const },
+    { x: -0.22, y: -0.14, z: 0.04, s: [0.9, 0.7, 0.7] as const },
+    { x: 0.22, y: -0.14, z: 0.04, s: [0.9, 0.7, 0.7] as const },
+    { x: -0.24, y: -0.08, z: 0.01, s: [0.8, 0.7, 0.6] as const },
+    { x: 0.24, y: -0.08, z: 0.01, s: [0.8, 0.7, 0.6] as const },
+  ];
+  for (const b of beardPositions) {
+    const bm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), beard);
+    bm.scale.set(b.s[0], b.s[1], b.s[2]);
+    bm.position.set(b.x, b.y, b.z);
+    headGroup.add(bm);
+  }
+
+  // Moustache — thin curved strip below nose
+  const moustacheL = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.05, 6, 10), beard);
+  moustacheL.rotation.z = Math.PI / 2;
+  moustacheL.rotation.y = 0.3;
+  moustacheL.position.set(-0.035, -0.09, 0.25);
+  const moustacheR = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.05, 6, 10), beard);
+  moustacheR.rotation.z = Math.PI / 2;
+  moustacheR.rotation.y = -0.3;
+  moustacheR.position.set(0.035, -0.09, 0.25);
+  headGroup.add(moustacheL, moustacheR);
+
+  // Soul patch under lower lip (small)
+  const soulPatch = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 10), beard);
+  soulPatch.scale.set(1, 0.7, 0.6);
+  soulPatch.position.set(0, -0.175, 0.245);
+  headGroup.add(soulPatch);
+
+  // -------- BROWS --------
+  const browGeo = new THREE.CapsuleGeometry(0.011, 0.075, 6, 10);
+  const browL = new THREE.Mesh(browGeo, browMat);
+  browL.rotation.z = Math.PI / 2 + 0.08;
   browL.position.set(-0.095, 0.075, 0.255);
-  browL.rotation.z = 0.06;
-  const browR = new THREE.Mesh(browGeo, brow);
+  browL.scale.set(1, 1, 0.5);
+  const browR = new THREE.Mesh(browGeo, browMat);
+  browR.rotation.z = Math.PI / 2 - 0.08;
   browR.position.set(0.095, 0.075, 0.255);
-  browR.rotation.z = -0.06;
+  browR.scale.set(1, 1, 0.5);
   headGroup.add(browL, browR);
 
-  // ---- Eyes — big almond Ghibli eyes ----
-  // Each eye = sclera oval + big iris + pupil + TWO white highlights
-  const makeGhibliEye = (side: 1 | -1) => {
+  // -------- EYES (Ghibli almond) --------
+  const makeEye = (side: 1 | -1) => {
     const g = new THREE.Group();
-    // Sclera — flattened sphere
-    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.056, 24, 18), eyeWhite);
-    sclera.scale.set(1.0, 0.85, 0.55);
+    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.05, 24, 18), eyeWhite);
+    sclera.scale.set(1.0, 0.85, 0.5);
     g.add(sclera);
-    // Iris — LARGE, dominant
-    const ir = new THREE.Mesh(new THREE.SphereGeometry(0.04, 20, 16), iris);
-    ir.scale.set(1.0, 1.05, 0.4);
-    ir.position.set(0, -0.005, 0.032);
+    const ir = new THREE.Mesh(new THREE.SphereGeometry(0.036, 24, 18), iris);
+    ir.scale.set(1.0, 1.05, 0.35);
+    ir.position.set(0, -0.003, 0.03);
     g.add(ir);
-    // Pupil
-    const pu = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 10), pupil);
-    pu.scale.set(1, 1.1, 0.4);
-    pu.position.set(0, -0.005, 0.045);
+    const pu = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 10), pupil);
+    pu.scale.set(1, 1.1, 0.35);
+    pu.position.set(0, -0.003, 0.043);
     g.add(pu);
-    // Two Ghibli highlights
     const hl1 = new THREE.Mesh(
       new THREE.SphereGeometry(0.011, 10, 8),
       new THREE.MeshBasicMaterial({ color: "#ffffff" })
     );
-    hl1.position.set(-0.014, 0.013, 0.05);
+    hl1.position.set(-0.012, 0.014, 0.048);
     g.add(hl1);
     const hl2 = new THREE.Mesh(
       new THREE.SphereGeometry(0.006, 8, 8),
       new THREE.MeshBasicMaterial({ color: "#ffffff" })
     );
-    hl2.position.set(0.012, -0.014, 0.05);
+    hl2.position.set(0.011, -0.013, 0.048);
     g.add(hl2);
-    // Upper lid line — thin dark strip
+    // Upper lid line
     const lid = new THREE.Mesh(
-      new THREE.BoxGeometry(0.11, 0.008, 0.004),
+      new THREE.CapsuleGeometry(0.004, 0.09, 4, 8),
       new THREE.MeshBasicMaterial({ color: "#150a06" })
     );
-    lid.position.set(0, 0.043, 0.05);
-    lid.rotation.z = side * 0.05;
+    lid.rotation.z = Math.PI / 2 + side * 0.05;
+    lid.position.set(0, 0.038, 0.048);
+    lid.scale.set(1, 1, 0.4);
     g.add(lid);
     g.position.set(side * 0.09, 0.028, 0.235);
     return { group: g };
   };
-  const eyeL = makeGhibliEye(-1);
-  const eyeR = makeGhibliEye(1);
+  const eyeL = makeEye(-1);
+  const eyeR = makeEye(1);
   headGroup.add(eyeL.group, eyeR.group);
 
-  // ---- Glasses ----
-  const rimGeo = new THREE.TorusGeometry(0.075, 0.008, 12, 24);
+  // -------- GLASSES --------
+  const rimGeo = new THREE.TorusGeometry(0.077, 0.007, 12, 32);
   const rimL = new THREE.Mesh(rimGeo, glassRim);
-  rimL.position.set(-0.09, 0.028, 0.26);
+  rimL.position.set(-0.09, 0.028, 0.263);
   const rimR = new THREE.Mesh(rimGeo, glassRim);
-  rimR.position.set(0.09, 0.028, 0.26);
+  rimR.position.set(0.09, 0.028, 0.263);
   const bridge = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.005, 0.005, 0.04, 10),
+    new THREE.CylinderGeometry(0.005, 0.005, 0.045, 10),
     glassRim
   );
   bridge.rotation.z = Math.PI / 2;
-  bridge.position.set(0, 0.028, 0.26);
+  bridge.position.set(0, 0.028, 0.263);
   const templeL = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.004, 0.004, 0.13, 8),
+    new THREE.CylinderGeometry(0.004, 0.004, 0.14, 8),
     glassRim
   );
   templeL.rotation.z = Math.PI / 2;
-  templeL.rotation.y = -0.15;
-  templeL.position.set(-0.23, 0.028, 0.17);
+  templeL.rotation.y = -0.14;
+  templeL.position.set(-0.23, 0.028, 0.175);
   const templeR = templeL.clone();
-  templeR.rotation.y = 0.15;
-  templeR.position.set(0.23, 0.028, 0.17);
-  const lensL = new THREE.Mesh(new THREE.CircleGeometry(0.07, 24), lens);
-  lensL.position.set(-0.09, 0.028, 0.264);
-  const lensR = new THREE.Mesh(new THREE.CircleGeometry(0.07, 24), lens);
-  lensR.position.set(0.09, 0.028, 0.264);
+  templeR.rotation.y = 0.14;
+  templeR.position.set(0.23, 0.028, 0.175);
+  const lensL = new THREE.Mesh(new THREE.CircleGeometry(0.072, 24), lens);
+  lensL.position.set(-0.09, 0.028, 0.267);
+  const lensR = new THREE.Mesh(new THREE.CircleGeometry(0.072, 24), lens);
+  lensR.position.set(0.09, 0.028, 0.267);
   headGroup.add(rimL, rimR, bridge, templeL, templeR, lensL, lensR);
 
-  // Nose — Ghibli style: barely a bump + a small shadow line
-  const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), skinShadow);
-  noseTip.position.set(0, -0.04, 0.28);
+  // -------- NOSE (Indian-appropriate — slightly more defined than earlier) --------
+  // Nose bridge (small vertical capsule)
+  const noseBridge = new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.05, 6, 10), skin);
+  noseBridge.scale.set(0.9, 1, 0.7);
+  noseBridge.position.set(0, 0.005, 0.27);
+  headGroup.add(noseBridge);
+  // Nose tip
+  const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.028, 20, 16), skin);
+  noseTip.scale.set(1, 0.9, 1.1);
+  noseTip.position.set(0, -0.05, 0.285);
   headGroup.add(noseTip);
-  const noseLine = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.008, 0.06),
-    noseShadow
-  );
-  noseLine.position.set(0.012, -0.015, 0.276);
-  headGroup.add(noseLine);
+  // Nostrils shadow
+  const nostrilMat = new THREE.MeshBasicMaterial({
+    color: "#6a3a24",
+    transparent: true,
+    opacity: 0.55,
+  });
+  const nostrilL = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 8), nostrilMat);
+  nostrilL.position.set(-0.014, -0.065, 0.29);
+  const nostrilR = nostrilL.clone();
+  nostrilR.position.x = 0.014;
+  headGroup.add(nostrilL, nostrilR);
 
-  // Mouth — soft small smile line
+  // -------- MOUTH (partially hidden by moustache — subtle smile) --------
   const mouthShape = new THREE.Mesh(
-    new THREE.TorusGeometry(0.045, 0.006, 6, 16, Math.PI * 0.75),
+    new THREE.TorusGeometry(0.04, 0.005, 6, 16, Math.PI * 0.7),
     mouthMat
   );
-  mouthShape.rotation.z = Math.PI + 0.3;
-  mouthShape.rotation.x = 0.1;
-  mouthShape.position.set(0, -0.14, 0.245);
+  mouthShape.rotation.z = Math.PI + 0.35;
+  mouthShape.rotation.x = 0.15;
+  mouthShape.position.set(0, -0.135, 0.25);
   headGroup.add(mouthShape);
 
-  // Blush circles — Ghibli signature
+  // -------- BLUSH --------
   const blushL = new THREE.Mesh(new THREE.CircleGeometry(0.035, 20), blush);
-  blushL.position.set(-0.14, -0.05, 0.255);
+  blushL.position.set(-0.16, -0.07, 0.245);
   const blushR = blushL.clone();
-  blushR.position.x = 0.14;
+  blushR.position.x = 0.16;
   headGroup.add(blushL, blushR);
 
-  // Neck
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.088, 0.13, 16), skin);
+  // =====================================================================
+  // NECK
+  // =====================================================================
+  const neckGeo = tapered(0.078, 0.086, 0.09, 0.14);
+  const neck = new THREE.Mesh(neckGeo, skin);
   neck.position.y = 1.36;
   root.add(neck);
 
-  // ---- Torso — soft chambray shirt over vest ----
-  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.55, 0.32), shirt);
-  chest.position.y = 1.05;
-  // Round shoulders a touch
-  root.add(chest);
-  // Vest opening down the middle
-  const vestPanel = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.55, 0.02), vest);
-  vestPanel.position.set(0, 1.05, 0.171);
-  root.add(vestPanel);
-  // Buttons
+  // =====================================================================
+  // TORSO — smooth lathed shirt shape (barrel with shoulder taper)
+  // =====================================================================
+  const torsoGeo = torsoGeometry(0.34, 0.32, 0.26, 0.65);
+  const torso = new THREE.Mesh(torsoGeo, shirt);
+  torso.position.y = 0.7;
+  root.add(torso);
+
+  // Shirt shadow band (subtle side shadow)
+  const shadowSide = new THREE.Mesh(torsoGeo.clone(), shirtShade);
+  shadowSide.position.y = 0.7;
+  shadowSide.scale.set(1.005, 1.005, 1.005);
+  // Clip via a plane — simplest: rotate & offset to left half via z clipping trick
+  // Instead: overlay a soft strip
+  root.add(shadowSide);
+  shadowSide.visible = false; // simplification — full torso is already toon-shaded
+
+  // Collar band (small torus around neck)
+  const collarBand = new THREE.Mesh(
+    new THREE.TorusGeometry(0.11, 0.025, 10, 24),
+    shirt
+  );
+  collarBand.rotation.x = Math.PI / 2;
+  collarBand.position.y = 1.3;
+  root.add(collarBand);
+
+  // Collar wings (two small tilted planes / capsules)
+  const collarWingGeo = new THREE.SphereGeometry(0.06, 16, 12);
+  const collarL = new THREE.Mesh(collarWingGeo, shirt);
+  collarL.scale.set(1.2, 0.35, 0.6);
+  collarL.position.set(-0.08, 1.28, 0.14);
+  collarL.rotation.z = 0.45;
+  const collarR = new THREE.Mesh(collarWingGeo, shirt);
+  collarR.scale.set(1.2, 0.35, 0.6);
+  collarR.position.set(0.08, 1.28, 0.14);
+  collarR.rotation.z = -0.45;
+  root.add(collarL, collarR);
+
+  // V-neck opening (dark small triangle to suggest shirt open)
+  const chestOpening = new THREE.Mesh(
+    new THREE.SphereGeometry(0.045, 12, 10),
+    skin
+  );
+  chestOpening.scale.set(0.9, 1.2, 0.3);
+  chestOpening.position.set(0, 1.22, 0.19);
+  root.add(chestOpening);
+
+  // Shirt buttons (down the middle)
   for (let i = 0; i < 4; i++) {
     const btn = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.014, 0.014, 0.008, 10),
+      new THREE.CylinderGeometry(0.011, 0.011, 0.005, 10),
       new THREE.MeshBasicMaterial({ color: "#c9a15a" })
     );
     btn.rotation.x = Math.PI / 2;
-    btn.position.set(0, 1.22 - i * 0.13, 0.185);
+    btn.position.set(0, 1.13 - i * 0.13, 0.22);
     root.add(btn);
   }
-  // Collar (soft, open)
-  const collarL = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.02), shirt);
-  collarL.position.set(-0.09, 1.32, 0.16);
-  collarL.rotation.z = 0.5;
-  const collarR = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.02), shirt);
-  collarR.position.set(0.09, 1.32, 0.16);
-  collarR.rotation.z = -0.5;
-  root.add(collarL, collarR);
-  // Waist
-  const waist = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.2, 0.29), shirt);
-  waist.position.y = 0.73;
-  root.add(waist);
-  // Shirt shadow band on left side (cel-shading suggestion)
-  const shadowBand = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.32), shirtShadow);
-  shadowBand.position.set(-0.28, 1.05, 0);
-  root.add(shadowBand);
 
-  // ---- Legs ----
+  // Pocket (small square outline suggestion — using a thin torus)
+  const pocket = new THREE.Mesh(
+    new THREE.TorusGeometry(0.045, 0.004, 6, 16),
+    shirtShade
+  );
+  pocket.rotation.x = Math.PI / 2;
+  pocket.scale.set(1.1, 0.85, 1);
+  pocket.position.set(-0.13, 1.06, 0.215);
+  root.add(pocket);
+
+  // Belt
+  const beltMesh = new THREE.Mesh(
+    new THREE.TorusGeometry(0.24, 0.025, 10, 32),
+    belt
+  );
+  beltMesh.rotation.x = Math.PI / 2;
+  beltMesh.scale.set(1.05, 0.55, 1);
+  beltMesh.position.y = 0.7;
+  root.add(beltMesh);
+  const buckleMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.07, 0.045, 0.02),
+    buckle
+  );
+  buckleMesh.position.set(0, 0.7, 0.25);
+  root.add(buckleMesh);
+
+  // =====================================================================
+  // LEGS — smooth tapered lathes (like actual leg shape)
+  // =====================================================================
   const legL = new THREE.Group();
-  legL.position.set(-0.13, 0.6, 0);
-  const thighL = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.35, 14), pants);
-  thighL.position.y = -0.175;
-  const shinL = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.35, 14), pants);
-  shinL.position.y = -0.525;
-  const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.08, 0.3), shoe);
-  shoeL.position.set(0, -0.74, 0.06);
-  const shoeCapL = new THREE.Mesh(new THREE.SphereGeometry(0.085, 14, 12), shoe);
-  shoeCapL.scale.set(1, 0.6, 1.4);
-  shoeCapL.position.set(0, -0.74, 0.16);
-  legL.add(thighL, shinL, shoeL, shoeCapL);
+  legL.position.set(-0.13, 0.7, 0);
+  // Thigh: wider at top (hip), narrows to knee
+  const thighL = new THREE.Mesh(tapered(0.115, 0.1, 0.09, 0.36), pants);
+  thighL.position.y = -0.36;
+  thighL.rotation.x = Math.PI;
+  // Shin: tapered from knee to ankle
+  const shinPivotL = new THREE.Group();
+  shinPivotL.position.y = -0.36;
+  const shinL = new THREE.Mesh(tapered(0.09, 0.08, 0.065, 0.36), pants);
+  shinL.position.y = -0.36;
+  shinL.rotation.x = Math.PI;
+  shinPivotL.add(shinL);
+  // Shoe — smooth ellipsoid (not a box)
+  const shoeL = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 14), shoe);
+  shoeL.scale.set(1.0, 0.55, 2.0);
+  shoeL.position.set(0, -0.4, 0.08);
+  shinPivotL.add(shoeL);
+  legL.add(thighL, shinPivotL);
   root.add(legL);
 
   const legR = new THREE.Group();
-  legR.position.set(0.13, 0.6, 0);
-  const thighR = thighL.clone();
-  const shinR = shinL.clone();
-  const shoeR = shoeL.clone();
-  const shoeCapR = shoeCapL.clone();
-  legR.add(thighR, shinR, shoeR, shoeCapR);
+  legR.position.set(0.13, 0.7, 0);
+  const thighR = new THREE.Mesh(tapered(0.115, 0.1, 0.09, 0.36), pants);
+  thighR.position.y = -0.36;
+  thighR.rotation.x = Math.PI;
+  const shinPivotR = new THREE.Group();
+  shinPivotR.position.y = -0.36;
+  const shinR = new THREE.Mesh(tapered(0.09, 0.08, 0.065, 0.36), pants);
+  shinR.position.y = -0.36;
+  shinR.rotation.x = Math.PI;
+  shinPivotR.add(shinR);
+  const shoeR = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 14), shoe);
+  shoeR.scale.set(1.0, 0.55, 2.0);
+  shoeR.position.set(0, -0.4, 0.08);
+  shinPivotR.add(shoeR);
+  legR.add(thighR, shinPivotR);
   root.add(legR);
 
-  // ---- Arms ----
+  // =====================================================================
+  // ARMS — tapered rolled sleeves + bare forearms
+  // =====================================================================
   const armL = new THREE.Group();
-  armL.position.set(-0.33, 1.28, 0);
-  const upperArmL = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.075, 0.32, 14),
+  armL.position.set(-0.34, 1.28, 0);
+  // Upper arm: shirt sleeve (rolled up to elbow)
+  const upperArmL = new THREE.Mesh(tapered(0.085, 0.08, 0.075, 0.28), shirt);
+  upperArmL.position.y = -0.28;
+  upperArmL.rotation.x = Math.PI;
+  // Sleeve cuff (roll) — small torus at elbow
+  const cuffL = new THREE.Mesh(
+    new THREE.TorusGeometry(0.088, 0.014, 8, 20),
     shirt
   );
-  upperArmL.position.y = -0.16;
-  const foreArmL = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.072, 0.058, 0.3, 14),
-    shirt
-  );
-  foreArmL.position.y = -0.47;
-  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 12), skin);
-  handL.scale.set(0.9, 1.1, 0.7);
-  handL.position.y = -0.65;
-  armL.add(upperArmL, foreArmL, handL);
+  cuffL.rotation.x = Math.PI / 2;
+  cuffL.position.y = -0.28;
+  // Forearm: bare skin, tapered
+  const foreArmPivotL = new THREE.Group();
+  foreArmPivotL.position.y = -0.28;
+  const foreArmL = new THREE.Mesh(tapered(0.075, 0.065, 0.055, 0.3), skin);
+  foreArmL.position.y = -0.3;
+  foreArmL.rotation.x = Math.PI;
+  // Hand — ellipsoid + subtle finger stub
+  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.062, 20, 14), skin);
+  handL.scale.set(0.85, 1.15, 0.55);
+  handL.position.set(0, -0.36, 0);
+  foreArmPivotL.add(foreArmL, handL);
+  armL.add(upperArmL, cuffL, foreArmPivotL);
   root.add(armL);
 
   const armR = new THREE.Group();
-  armR.position.set(0.33, 1.28, 0);
-  const upperArmR = upperArmL.clone();
-  const foreArmR = foreArmL.clone();
-  const handR = handL.clone();
-  armR.add(upperArmR, foreArmR, handR);
+  armR.position.set(0.34, 1.28, 0);
+  const upperArmR = new THREE.Mesh(tapered(0.085, 0.08, 0.075, 0.28), shirt);
+  upperArmR.position.y = -0.28;
+  upperArmR.rotation.x = Math.PI;
+  const cuffR = new THREE.Mesh(
+    new THREE.TorusGeometry(0.088, 0.014, 8, 20),
+    shirt
+  );
+  cuffR.rotation.x = Math.PI / 2;
+  cuffR.position.y = -0.28;
+  const foreArmPivotR = new THREE.Group();
+  foreArmPivotR.position.y = -0.28;
+  const foreArmR = new THREE.Mesh(tapered(0.075, 0.065, 0.055, 0.3), skin);
+  foreArmR.position.y = -0.3;
+  foreArmR.rotation.x = Math.PI;
+  const handR = new THREE.Mesh(new THREE.SphereGeometry(0.062, 20, 14), skin);
+  handR.scale.set(0.85, 1.15, 0.55);
+  handR.position.set(0, -0.36, 0);
+  foreArmPivotR.add(foreArmR, handR);
+  armR.add(upperArmR, cuffR, foreArmPivotR);
   root.add(armR);
 
   // Shadow blob
   const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.36, 24),
+    new THREE.CircleGeometry(0.38, 24),
     new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.28 })
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.005;
   root.add(shadow);
 
-  // ---- Anim state ----
+  // -------- Anim state --------
   let t = 0;
   let blink = 0;
   let blinkTimer = 3 + Math.random() * 2;
@@ -500,19 +704,26 @@ function buildGhibliRig() {
 
       const c = Math.sin(t);
       const c2 = Math.sin(t + Math.PI);
-      const amp = 0.6 * w;
+      const amp = 0.55 * w;
+
+      // Hip swing (whole leg groups from hip)
       legL.rotation.x = c * amp;
       legR.rotation.x = c2 * amp;
-      shinL.rotation.x = Math.max(0, -c) * 0.6 * w;
-      shinR.rotation.x = Math.max(0, -c2) * 0.6 * w;
-      armL.rotation.x = c2 * amp * 0.85;
-      armR.rotation.x = c * amp * 0.85;
-      foreArmL.rotation.x = Math.max(0, c) * 0.5 * w;
-      foreArmR.rotation.x = Math.max(0, c2) * 0.5 * w;
+      // Knee bend on the return stroke
+      shinPivotL.rotation.x = Math.max(0, -c) * 0.7 * w;
+      shinPivotR.rotation.x = Math.max(0, -c2) * 0.7 * w;
 
+      // Arm swing opposite to legs
+      armL.rotation.x = c2 * amp * 0.9;
+      armR.rotation.x = c * amp * 0.9;
+      // Elbow bend
+      foreArmPivotL.rotation.x = Math.max(0, c) * 0.55 * w;
+      foreArmPivotR.rotation.x = Math.max(0, c2) * 0.55 * w;
+
+      // Body bob + subtle chest twist
       root.position.y = Math.abs(Math.sin(t * 2)) * 0.03 * w;
-      chest.rotation.y = c * 0.05 * w;
-      // Head bob — gentle Ghibli
+      torso.rotation.y = c * 0.05 * w;
+      // Head counter-twist (feels alive)
       headPivot.rotation.z = Math.sin(t * 0.5) * 0.02 * (1 - w);
 
       // Blink
@@ -531,7 +742,11 @@ function buildGhibliRig() {
         const g = smoothstep(0.4, 1, greeting);
         armR.rotation.x = THREE.MathUtils.lerp(armR.rotation.x, -1.4, g);
         armR.rotation.z = THREE.MathUtils.lerp(armR.rotation.z, -0.5, g);
-        foreArmR.rotation.x = THREE.MathUtils.lerp(foreArmR.rotation.x, -0.4, g);
+        foreArmPivotR.rotation.x = THREE.MathUtils.lerp(
+          foreArmPivotR.rotation.x,
+          -0.4,
+          g
+        );
         armR.rotation.z += Math.sin(t * 4.5) * 0.28 * g;
       }
     },
