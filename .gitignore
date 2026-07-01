@@ -1,0 +1,36 @@
+# deps
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+
+# next.js
+.next
+out
+build
+dist
+
+# env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# vercel
+.vercel
+
+# ts
+*.tsbuildinfo
+next-env.d.ts
+
+# os / editor
+.DS_Store
+*.log
+.idea
+.vscode
+
+# runtime debug
+scripts/tmp
